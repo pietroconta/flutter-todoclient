@@ -47,14 +47,13 @@ class _EditTodoTypeState extends State<EditTodoType> {
   void addNewType(TodoType newType, GlobalKey<FormState> key) async {
     if (key.currentState!.validate()) {
       key.currentState!.save();
-      Uri uri = Uri.http("localhost:5000", "api/type/add");
+      Uri uri = Uri.http("localhost:5000", "api/type/save");
       var hex = '#${newType.color.value.toRadixString(16)}';
       var requestBody = jsonEncode({
-        'id': newType.id,
         'description': newType.description,
         'color': hex,
       });
-      var response = await http.put(
+      var response = await http.post(
         uri,
         body: requestBody,
         headers: {"Content-Type": "application/json"},
@@ -62,11 +61,13 @@ class _EditTodoTypeState extends State<EditTodoType> {
       if (response.statusCode >= 400) {
         return;
       } else if (response.statusCode == 200) {
+
+        newType.id = jsonDecode(response.body)["id"];
         _hasSaved = true;
         newType.hasUpdated = true;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Succesfully saved"),
+            content: Text("Succesfully created"),
             duration: Duration(milliseconds: 1500),
           ),
         );
@@ -108,8 +109,14 @@ class _EditTodoTypeState extends State<EditTodoType> {
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton(
               onPressed: () {
-                setState(() {           
-                  widget.typeList[0] = TodoType(
+                setState(() {      
+                  var keys = widget.typeList.keys.toList();
+                  var newKey = keys[keys.length - 1]+1; 
+                  while(keys.contains(newKey)){
+                    newKey ++; 
+                  }
+                
+                  widget.typeList[newKey] = TodoType(
                     id: 0,
                     color: Colors.red,
                     description: "",

@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:todo_client/utils/hex_color_extension.dart';
 class TodoType {
 
-  final int id;
+   int id;
   Color color;
   String description;
   bool hasUpdated = false;

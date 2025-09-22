@@ -162,24 +162,47 @@ class _LandingPageState extends State<LandingPage> {
                   bool? hasSaved = await navToEditTypes(copyTypeMap);
 
                   if (hasSaved!) {
-                    if (hasSaved!) {
-                      setState(() {
-                        // aggiorno solo i tipi dei todo esistenti senza sostituire l'oggetto
-                        for (var todo in todos) {
-                          if (copyTypeMap.containsKey(todo.type.id) &&
-                              copyTypeMap[todo.type.id]!.hasUpdated) {
-                            final updatedType = copyTypeMap[todo.type.id]!;
+                    setState(() {
+                      // aggiorno solo i tipi dei todo esistenti senza sostituire l'oggetto
+                      for (var todo in todos) {
+                        if (copyTypeMap.containsKey(todo.type.id) &&
+                            copyTypeMap[todo.type.id]!.hasUpdated) {
+                          final updatedType = copyTypeMap[todo.type.id]!;
 
-                            // Aggiorno solo i campi dell'oggetto esistente
-                            todo.type.color = updatedType.color;
-                            todo.type.description = updatedType.description;
+                          // Aggiorno solo i campi dell'oggetto esistente
+                          todo.type.color = updatedType.color;
+                          todo.type.description = updatedType.description;
 
-                            // Resetto hasUpdated
-                            todo.type.hasUpdated = false;
+                          // Resetto hasUpdated
+                          todo.type.hasUpdated = false;
+                        }
+                      }
+
+                     
+                      for (var entry in copyTypeMap.entries) {
+                        if (entry.value.hasUpdated) {
+                          if (typeMap.containsKey(entry.key)) {
+                            typeMap[entry.key]!.color = entry.value.color;
+                            typeMap[entry.key]!.description =
+                                entry.value.description;
+                            typeMap[entry.key]!.hasUpdated = false;
                           }
                         }
-                      });
-                    }
+                      }
+
+                      // aggiunta di nuovi tipi
+                      var keys = copyTypeMap.keys.toList();
+                      for (int i = 0; i < keys.length; i++) {
+                        var key = keys[i];
+
+                        if (!typeMap.containsKey(key)) {
+                          var type = copyTypeMap[key];
+                          if (type != null && type.id != 0) {
+                            typeMap[key] = type;
+                          }
+                        }
+                      }
+                    });
                   }
                 },
                 child: Text("Edit To Do types"),
