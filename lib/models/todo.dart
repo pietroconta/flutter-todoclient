@@ -4,7 +4,7 @@ class Todo {
   final int id;
   final String description;
   final bool urgent;
-  final TodoType type;
+  TodoType type;
   bool checked = false;
   Todo({required this.id, required this.description, required this.urgent, required this.type});
 

@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:todo_client/models/todo.dart';
 import 'package:todo_client/models/todo_type.dart';
 import 'package:todo_client/screen/add_todo.dart';
+import 'package:todo_client/screen/edit_todo_type.dart';
 import 'package:todo_client/screen/upt_todo.dart';
 import 'package:todo_client/widget/countdown_bar.dart';
 
@@ -44,6 +45,13 @@ class _LandingPageState extends State<LandingPage> {
     return Navigator.push<Todo>(
       context,
       MaterialPageRoute(builder: (ctx) => dest),
+    );
+  }
+
+  Future<bool?> navToEditTypes<T>(typeList) {
+    return Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (ctx) => EditTodoType(typeList: typeList)),
     );
   }
 
@@ -125,18 +133,58 @@ class _LandingPageState extends State<LandingPage> {
         title: const Text("To Do List"),
         iconTheme: IconThemeData(size: 40),
         actions: [
-          IconButton(
-            onPressed: () async {
-              final Todo? newToDo = await navigateTo(
-                AddTodo(typeList: typeMap),
-              );
-              if (newToDo != null) {
-                setState(() {
-                  todos.add(newToDo);
-                });
-              }
-            },
-            icon: Icon(Icons.add, color: Colors.black),
+          PopupMenuButton(
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                onTap: () async {
+                  final Todo? newToDo = await navigateTo(
+                    AddTodo(typeList: typeMap),
+                  );
+                  if (newToDo != null) {
+                    setState(() {
+                      todos.add(newToDo);
+                    });
+                  }
+                },
+                child: Text("Add To Do"),
+              ),
+              PopupMenuItem(
+                onTap: () async {
+                  Map<int, TodoType> copyTypeMap = {
+                    for (var entry in typeMap.entries)
+                      entry.key: TodoType.copy(
+                        entry.value,
+                      ), // o un costruttore copy
+                  };
+
+                  //Map<int, TodoType> copyTypeMap = Map.from(typeMap);
+
+                  bool? hasSaved = await navToEditTypes(copyTypeMap);
+
+                  if (hasSaved!) {
+                    if (hasSaved!) {
+                      setState(() {
+                        // aggiorno solo i tipi dei todo esistenti senza sostituire l'oggetto
+                        for (var todo in todos) {
+                          if (copyTypeMap.containsKey(todo.type.id) &&
+                              copyTypeMap[todo.type.id]!.hasUpdated) {
+                            final updatedType = copyTypeMap[todo.type.id]!;
+
+                            // Aggiorno solo i campi dell'oggetto esistente
+                            todo.type.color = updatedType.color;
+                            todo.type.description = updatedType.description;
+
+                            // Resetto hasUpdated
+                            todo.type.hasUpdated = false;
+                          }
+                        }
+                      });
+                    }
+                  }
+                },
+                child: Text("Edit To Do types"),
+              ),
+            ],
           ),
         ],
       ),
@@ -170,8 +218,16 @@ class _LandingPageState extends State<LandingPage> {
                         child: Column(
                           children: todos.map((todo) {
                             return InkWell(
-                              onTap: (){
-                                navigateTo(UptTodo(typeList: typeMap, todoToUpt: todo));
+                              onTap: () async {
+                                final Todo? newToDo = await navigateTo(
+                                  UptTodo(typeList: typeMap, todoToUpt: todo),
+                                );
+                                if (newToDo != null) {
+                                  setState(() {
+                                    todos.removeAt(todos.indexOf(todo));
+                                    todos.add(newToDo);
+                                  });
+                                }
                               },
                               child: Container(
                                 width: double.infinity,
@@ -186,16 +242,18 @@ class _LandingPageState extends State<LandingPage> {
                                   children: [
                                     Row(
                                       children: [
+                                        if (todo.urgent) Icon(Icons.warning),
                                         Checkbox(
                                           value: todo.checked,
                                           onChanged: (value) {
                                             setState(() {
-                                              if (!todo.checked && !isDisabled) {
+                                              if (!todo.checked &&
+                                                  !isDisabled) {
                                                 // Checkbox era false, ora diventa true → avvia countdown
                                                 todo.checked = true;
                                                 isChecked = true;
-                                                disableCheckbox(); 
-                                              } else {
+                                                disableCheckbox();
+                                              } else if (todo.checked) {
                                                 // Checkbox era true, ora diventa false → blocca countdown
                                                 todo.checked = false;
                                                 isChecked = false;
@@ -204,11 +262,13 @@ class _LandingPageState extends State<LandingPage> {
                                             });
                                           },
                                         ),
+
                                         Expanded(
                                           child: Text(
                                             todo.description,
                                             style: TextStyle(
-                                              color: isColorDark(todo.type.color)
+                                              color:
+                                                  isColorDark(todo.type.color)
                                                   ? Colors.white
                                                   : Colors.black,
                                             ),

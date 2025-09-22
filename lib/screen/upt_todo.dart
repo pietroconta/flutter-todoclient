@@ -41,10 +41,11 @@ class _UptTodoState extends State<UptTodo> {
       try {
         final response = await http.put(
           Uri.parse(
-            'http://localhost:5000/api/todo/update/${widget.todoToUpt.id}',
+            'http://localhost:5000/api/todo/update/',
           ),
           headers: {"Content-Type": "application/json"},
           body: jsonEncode({
+            "id": widget.todoToUpt.id,
             "description": _descriptionController.text,
             "urgent": _isUrgentField,
             "todoType": _selectedType.id,
