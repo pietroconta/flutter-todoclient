@@ -14,6 +14,7 @@ class EditTodoType extends StatefulWidget {
 
 class _EditTodoTypeState extends State<EditTodoType> {
   bool _hasSaved = false;
+  ScrollController scrollController = ScrollController();
   void updateType(TodoType toUpdate, GlobalKey<FormState> key) async {
     if (key.currentState!.validate()) {
       key.currentState!.save();
@@ -97,6 +98,7 @@ class _EditTodoTypeState extends State<EditTodoType> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: scrollController,
               itemCount: widget.typeList.keys.length,
               itemBuilder: (context, index) {
                 TodoType currentType =
@@ -120,6 +122,14 @@ class _EditTodoTypeState extends State<EditTodoType> {
                     id: 0,
                     color: Colors.red,
                     description: "",
+                  );
+                });
+
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  scrollController.animateTo(
+                    scrollController.position.maxScrollExtent,
+                    duration: Duration(milliseconds: 100),
+                    curve: Curves.easeOut,
                   );
                 });
               },

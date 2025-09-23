@@ -12,10 +12,12 @@ class TypeCard extends StatefulWidget {
 
 class _TypeCardState extends State<TypeCard> {
 
+  late TextEditingController _controller;
+
   @override
   void initState() {
     // TODO: implement initState
-
+   _controller = TextEditingController(text: widget.type.description);
     super.initState();
   }
 
@@ -55,13 +57,14 @@ class _TypeCardState extends State<TypeCard> {
           child: Column(
             children: [
               TextFormField(
+                controller: _controller,
                 onSaved: (value){
                   setState(() {
                     widget.type.description = value!;
 
                   });
                 },
-                initialValue:  widget.type.description,
+            
                 decoration: const InputDecoration(
                   label: Text("Description"),
                   isDense: true, // compatto
