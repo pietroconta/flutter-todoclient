@@ -37,6 +37,15 @@ class _LandingPageState extends State<LandingPage> {
     });
   }
 
+  bool isContained(TodoType type) {
+    for (var t in typeMap.entries) {
+      if (t.value.id == type.id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool isColorDark(Color c) {
     return c.computeLuminance() < 0.5;
   }
@@ -51,7 +60,9 @@ class _LandingPageState extends State<LandingPage> {
   Future<bool?> navToEditTypes<T>(typeList) {
     return Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (ctx) => EditTodoType(typeList: typeList)),
+      MaterialPageRoute(
+        builder: (ctx) => EditTodoType(originalTypeList: typeList),
+      ),
     );
   }
 
@@ -148,60 +159,18 @@ class _LandingPageState extends State<LandingPage> {
                 },
                 child: Text("Add To Do"),
               ),
+
               PopupMenuItem(
                 onTap: () async {
-                  Map<int, TodoType> copyTypeMap = {
-                    for (var entry in typeMap.entries)
-                      entry.key: TodoType.copy(
-                        entry.value,
-                      ), // o un costruttore copy
-                  };
+                  bool? hasSaved = await navToEditTypes(typeMap);
 
-                  //Map<int, TodoType> copyTypeMap = Map.from(typeMap);
-
-                  bool? hasSaved = await navToEditTypes(copyTypeMap);
-
-                  if (hasSaved!) {
+                  if (hasSaved == true) {
                     setState(() {
-                      // aggiorno solo i tipi dei todo esistenti senza sostituire l'oggetto
-                      for (var todo in todos) {
-                        if (copyTypeMap.containsKey(todo.type.id) &&
-                            copyTypeMap[todo.type.id]!.hasUpdated) {
-                          final updatedType = copyTypeMap[todo.type.id]!;
-
-                          // Aggiorno solo i campi dell'oggetto esistente
-                          todo.type.color = updatedType.color;
-                          todo.type.description = updatedType.description;
-
-                          // Resetto hasUpdated
-                          todo.type.hasUpdated = false;
-                        }
-                      }
-
-                     
-                      for (var entry in copyTypeMap.entries) {
-                        if (entry.value.hasUpdated) {
-                          if (typeMap.containsKey(entry.key)) {
-                            typeMap[entry.key]!.color = entry.value.color;
-                            typeMap[entry.key]!.description =
-                                entry.value.description;
-                            typeMap[entry.key]!.hasUpdated = false;
-                          }
-                        }
-                      }
-
-                      // aggiunta di nuovi tipi
-                      var keys = copyTypeMap.keys.toList();
-                      for (int i = 0; i < keys.length; i++) {
-                        var key = keys[i];
-
-                        if (!typeMap.containsKey(key)) {
-                          var type = copyTypeMap[key];
-                          if (type != null && type.id != 0) {
-                            typeMap[key] = type;
-                          }
-                        }
-                      }
+                      todos.removeWhere((todo){
+                        if(!isContained(todo.type)){
+                          return true;
+                        }return false;
+                      });
                     });
                   }
                 },

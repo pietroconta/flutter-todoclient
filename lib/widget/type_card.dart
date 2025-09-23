@@ -3,9 +3,9 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:todo_client/models/todo_type.dart';
 
 class TypeCard extends StatefulWidget {
-  TypeCard({super.key, required this.type, required this.onSave});
+  TypeCard({super.key, required this.type, required this.onSave, required this.onDelete});
   TodoType type;
-  Function onSave;
+  Function onSave, onDelete;
   @override
   State<TypeCard> createState() => _TypeCardState();
 }
@@ -56,6 +56,14 @@ class _TypeCardState extends State<TypeCard> {
           key: _formKey,
           child: Column(
             children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                   IconButton(icon: Icon(Icons.delete), onPressed: (){
+                    widget.onDelete(widget.type);
+                   })
+                ],
+              ),
               TextFormField(
                 controller: _controller,
                 onSaved: (value){
@@ -100,8 +108,10 @@ class _TypeCardState extends State<TypeCard> {
               SizedBox(height: 20,),
               ElevatedButton(onPressed: (){
                 widget.onSave(widget.type, _formKey);
-              }, child: Text("Salva"))
+              }, child: Text("Salva")),
+              
             ],
+           
           ),
         ),
       ),
