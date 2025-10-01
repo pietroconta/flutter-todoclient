@@ -1,43 +1,55 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:todo_client/models/todo.dart';
 import 'package:todo_client/models/todo_type.dart';
+import 'package:todo_client/providers/todo_provider.dart';
+import 'dart:convert';
 
-class AddTodo extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:todo_client/models/todo.dart';
+import 'package:todo_client/models/todo_type.dart';
+import 'package:todo_client/providers/todo_provider.dart';
+
+class AddTodo extends ConsumerStatefulWidget {
   const AddTodo({super.key, required this.typeList});
   final Map<int, TodoType> typeList;
 
   @override
-  State<AddTodo> createState() => _AddTodoState();
+  ConsumerState<AddTodo> createState() => _AddTodoState();
 }
 
-class _AddTodoState extends State<AddTodo> {
+class _AddTodoState extends ConsumerState<AddTodo> {
   final List<DropdownMenuItem<TodoType>> _items = [];
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   TodoType? _selectedType;
   bool _isUrgentField = false;
 
+  // Placeholder
+  final TodoType placeholder = TodoType(id: 0, description: "Seleziona un tipo", color: Colors.transparent);
+
   void setDropDownItems() {
-    List<int> keys = widget.typeList.keys.toList();
-    for (int key in keys) {
-      var item = DropdownMenuItem<TodoType>(
-        value: widget.typeList[key],
-        child: Text(widget.typeList[key]!.description),
-      );
+    _items.clear();
 
-      _items.add(item);
-    }
+    // aggiungo subito il placeholder
+    _items.add(DropdownMenuItem<TodoType>(
+      value: placeholder,
+      child: Text(placeholder.description),
+    ));
 
-    var initial = DropdownMenuItem<TodoType>(
-      value: _selectedType,
-      child: Text("Seleziona un tipo"),
-    );
-    
+    widget.typeList.forEach((key, type) {
+      _items.add(DropdownMenuItem<TodoType>(
+        value: type,
+        child: Text(type.description),
+      ));
+    });
 
-    _items.insert(0, initial);
+    _selectedType = placeholder; // valore iniziale
   }
 
   @override
@@ -49,34 +61,19 @@ class _AddTodoState extends State<AddTodo> {
   void sumbitForm() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      Todo? newToDo;
-
-      try{
-      final typeResponse = await http.post(
-        Uri.parse('http://localhost:5000/api/todo/save'),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "description": _descriptionController.text,
-          "urgent": _isUrgentField,
-          "todoType": _selectedType!.id,
-        }),
+      Todo newToDo = Todo(
+        id: 0,
+        description: _descriptionController.text,
+        urgent: _isUrgentField,
+        type: _selectedType!,
       );
-
-      if (typeResponse.statusCode == 200) {
-        print("Todo aggiunto con successo");
-        var body = jsonDecode(typeResponse.body);
-        newToDo = Todo(id:  body["id"], description:  body["description"], urgent:  body["urgent"], type: _selectedType!);
-        print(newToDo.toString());
-      } else {
-        print("Errore nell'aggiunta del todo");
+      print(newToDo.toString());
+      ref.read(todoProvider.notifier).addTodo(newToDo);
+      if (ref.read(todoProvider).errorMessage.isNotEmpty) {
+        print(" Error new: ${ref.read(todoProvider).errorMessage}");
       }
-
-      }catch(e){
-        print("Errore nell'aggiunta del todo");
-      }
-
-
-      Navigator.pop(context, newToDo);
+      ref.read(todoProvider.notifier).flushErrorMessage();
+      Navigator.pop(context);
     }
   }
 
@@ -95,8 +92,11 @@ class _AddTodoState extends State<AddTodo> {
                   children: [
                     TextFormField(
                       controller: _descriptionController,
-                      validator: (value){
-                        if(value!.isEmpty) return "La descrizione non può essere vuota";
+                      validator: (value) {
+                        if (value!.isEmpty) {
+                          return "La descrizione non può essere vuota";
+                        }
+                        return null;
                       },
                       decoration: const InputDecoration(
                         labelText: "Description",
@@ -104,36 +104,24 @@ class _AddTodoState extends State<AddTodo> {
                       ),
                     ),
                     SizedBox(height: 10),
-                    /*DropdownButton<String>(
-                      value: _selectedValue, // può essere null
-                      hint: const Text("Seleziona un tipo"),
-                      items: widget.typeList.map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _selectedValue = newValue;
-                        });
-                      },
-                    ),*/
-                    //DropdownButton<TodoType>(items: widget.typeList, onChanged: onChanged)
                     DropdownButtonFormField<TodoType>(
+                      value: _selectedType,
                       items: _items,
                       validator: (value) {
-                        if (value!.id == 0) {
+                        if (value == null || value.id == 0) {
                           return "Seleziona almeno un valore!";
-                        } else {
-                          return null;
                         }
+                        return null;
                       },
                       onChanged: (value) {
                         setState(() {
-                          _selectedType = value!;
+                          _selectedType = value;
                         });
                       },
+                      decoration: const InputDecoration(
+                        labelText: "Tipo",
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     SizedBox(height: 10),
                     Row(
@@ -143,7 +131,7 @@ class _AddTodoState extends State<AddTodo> {
                           value: _isUrgentField,
                           onChanged: (value) {
                             setState(() {
-                              _isUrgentField = !_isUrgentField;
+                              _isUrgentField = value ?? false;
                             });
                           },
                         ),

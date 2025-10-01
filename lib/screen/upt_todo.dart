@@ -1,30 +1,37 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:todo_client/models/todo.dart';
 import 'package:todo_client/models/todo_type.dart';
+import 'package:todo_client/providers/todo_provider.dart';
+import 'package:todo_client/providers/todo_type_provider.dart';
 
-class UptTodo extends StatefulWidget {
-  UptTodo({super.key, required this.typeList, required this.todoToUpt});
+class UptTodo extends ConsumerStatefulWidget {
+  UptTodo({super.key, required this.todoToUpt});
 
   final Todo todoToUpt;
-  final Map<int, TodoType> typeList;
+  
   @override
-  State<UptTodo> createState() => _UptTodoState();
+  ConsumerState<UptTodo> createState() => _UptTodoState();
 }
 
-class _UptTodoState extends State<UptTodo> {
+class _UptTodoState extends ConsumerState<UptTodo> {
   late TextEditingController _descriptionController;
   GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late TodoType _selectedType;
+  late Map<int, TodoType> typeMap;
   final List<DropdownMenuItem<TodoType>> _items = [];
   late bool _isUrgentField;
   @override
   void initState() {
+    typeMap = ref.read(todoTypeProvider).todoTypeMap;
     _selectedType = widget.todoToUpt.type;
     _isUrgentField = widget.todoToUpt.urgent;
     setDropDownItems();
+
+    
 
     _descriptionController = TextEditingController(
       text: widget.todoToUpt.description,
@@ -36,52 +43,27 @@ class _UptTodoState extends State<UptTodo> {
   void sumbitForm() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      Todo? updatedToDo;
-
-      try {
-        final response = await http.put(
-          Uri.parse(
-            'http://localhost:5000/api/todo/update/',
+      Todo? updatedTodo = Todo(id: widget.todoToUpt.id, description: _descriptionController.text, urgent: _isUrgentField, type: _selectedType);
+      ref.read(todoProvider.notifier).updateTodo(updatedTodo);
+      if(ref.read(todoProvider).errorMessage.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error on updating todo"),
+            duration: Duration(milliseconds: 1500),
           ),
-          headers: {"Content-Type": "application/json"},
-          body: jsonEncode({
-            "id": widget.todoToUpt.id,
-            "description": _descriptionController.text,
-            "urgent": _isUrgentField,
-            "todoType": _selectedType.id,
-          }),
         );
-
-        if (response.statusCode == 200) {
-          print("Todo aggiornato con successo");
-
-          final body = jsonDecode(response.body);
-          updatedToDo = Todo(
-            id: body["id"],
-            description: body["description"],
-            urgent: body["urgent"],
-            type: _selectedType,
-          );
-
-          print(updatedToDo.toString());
-        } else {
-          print("Errore nell'aggiornamento del todo: ${response.statusCode}");
-        }
-      } catch (e) {
-        print("Errore nella richiesta di aggiornamento: $e");
       }
-
       // Chiudo la pagina passando il Todo aggiornato indietro
-      Navigator.pop(context, updatedToDo);
+      Navigator.pop(context);
     }
   }
 
   void setDropDownItems() {
-    List<int> keys = widget.typeList.keys.toList();
+    List<int> keys = typeMap.keys.toList();
     for (int key in keys) {
       var item = DropdownMenuItem<TodoType>(
-        value: widget.typeList[key],
-        child: Text(widget.typeList[key]!.description),
+        value: typeMap[key],
+        child: Text(typeMap[key]!.description),
       );
 
       _items.add(item);

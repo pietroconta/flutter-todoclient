@@ -1,34 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_client/models/todo.dart';
 import 'package:todo_client/models/todo_type.dart';
+import 'package:todo_client/providers/todo_provider.dart';
+import 'package:todo_client/providers/todo_type_provider.dart';
+import 'package:todo_client/providers/todotype_provider.dart';
 import 'package:todo_client/screen/add_todo.dart';
 import 'package:todo_client/screen/edit_todo_type.dart';
 import 'package:todo_client/screen/upt_todo.dart';
 import 'package:todo_client/widget/countdown_bar.dart';
 
-class LandingPage extends StatefulWidget {
+class LandingPage extends ConsumerStatefulWidget {
   const LandingPage({super.key});
 
   @override
-  State<LandingPage> createState() => _LandingPageState();
+  ConsumerState<LandingPage> createState() => _LandingPageState();
 }
 
-class _LandingPageState extends State<LandingPage> {
-  late Future<List<Todo>> futureTodos; // Future stabile
-  List<Todo> todos = []; // Lista aggiornata dai dati del Future
+class _LandingPageState extends ConsumerState<LandingPage> {
+  late Future<List<Todo>> futureTodos;
+
+  // late TodoTypeResponse typeMapResponse;
+  // late TodoResponse todoResponse;
 
   bool isChecked = false; // Variabile per il checkbox
 
-  Map<int, TodoType> typeMap = {}; // Map per i tipi
+  Map<int, Todo> todoMap = {};
+  Map<int, TodoType> typeMap = {};
 
   bool isDisabled = false;
   @override
   void initState() {
     super.initState();
-    futureTodos = fetchData(); // Creo il future solo una volta
+    //futureTodos = fetchData(); // Creo il future solo una volta
   }
 
   void disableCheckbox() {
@@ -60,85 +64,23 @@ class _LandingPageState extends State<LandingPage> {
   Future<bool?> navToEditTypes<T>(typeList) {
     return Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (ctx) => EditTodoType(originalTypeList: typeList),
-      ),
+      MaterialPageRoute(builder: (ctx) => EditTodoType()),
     );
-  }
-
-  List<String> todoType = [];
-  Future<List<Todo>> fetchData() async {
-    // 1. Prendo tutti i tipi
-    final typeResponse = await http.get(
-      Uri.parse('http://localhost:5000/api/type/getall'),
-    );
-
-    if (typeResponse.statusCode != 200) {
-      throw Exception('Errore nel caricamento dei tipi');
-    }
-
-    final List<dynamic> typeData = jsonDecode(typeResponse.body);
-
-    typeMap = {
-      for (var t in typeData)
-        (t['id'] as int): TodoType.fromJson(t as Map<String, dynamic>),
-    };
-
-    // 2. Prendo tutti i Todo
-    final todoResponse = await http.get(
-      Uri.parse('http://localhost:5000/api/todo/getall'),
-    );
-    if (todoResponse.statusCode != 200) {
-      throw Exception('Errore nel caricamento dei todo');
-    }
-
-    final List<dynamic> todoData = jsonDecode(todoResponse.body);
-
-    // 3. Costruisco i Todo sostituendo l’id del tipo con l’oggetto TodoType
-    todos = todoData.map((t) {
-      final todoMap = t as Map<String, dynamic>;
-      return Todo(
-        id: todoMap['id'] as int,
-        description: todoMap['description'] as String,
-        urgent: todoMap['urgent'] as bool,
-        type: typeMap[todoMap['todoType']]!,
-      );
-    }).toList();
-
-    todos.sort((a, b) {
-      return a.type.id.compareTo(b.type.id);
-    }); // Ordino i todo per il tipo
-
-    return todos;
-  }
-
-  void deleteToDo() async {
-    Todo todoToDelete = todos.firstWhere((todo) => todo.checked);
-    try {
-      final typeResponse = await http.delete(
-        Uri.parse('http://localhost:5000/api/todo/delete/${todoToDelete.id}'),
-        headers: {"Content-Type": "application/json"},
-      );
-
-      if (typeResponse.statusCode == 200) {
-        print(
-          "Todo: ID: ${todoToDelete.id} \n Description: ${todoToDelete.description}\n Urgent: ${todoToDelete.urgent}\n è stato eliminato con successo!",
-        );
-      } else if (typeResponse.statusCode >= 400) {
-        print("Errore nell'eliminazione del todo lato server");
-      }
-    } catch (e) {
-      print("Errore nell'eliminazione del todo lato client: ${e.toString()}");
-    }
-    setState(() {
-      isDisabled = false;
-      isChecked = false;
-      todos.remove(todoToDelete);
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    //subscribe al provider di todotyperesponse
+    //con il watch ogni volta che cambia lo stato viene triggerato il build di nuovo
+
+    final typeMapResponse = ref.watch(todoTypeProvider);
+    final todoResponse = ref.watch(todoTypeCombProvider);
+
+    typeMap = typeMapResponse.todoTypeMap;
+
+    todoMap = todoResponse.todoMap;
+    /*print("typemap: ${typeMap.length}");
+    print("todotype: ${todoMap.length}");*/
     return Scaffold(
       appBar: AppBar(
         title: const Text("To Do List"),
@@ -147,32 +89,15 @@ class _LandingPageState extends State<LandingPage> {
           PopupMenuButton(
             itemBuilder: (context) => [
               PopupMenuItem(
-                onTap: () async {
-                  final Todo? newToDo = await navigateTo(
-                    AddTodo(typeList: typeMap),
-                  );
-                  if (newToDo != null) {
-                    setState(() {
-                      todos.add(newToDo);
-                    });
-                  }
+                onTap: () {
+                  navigateTo(AddTodo(typeList: typeMap));
                 },
                 child: Text("Add To Do"),
               ),
 
               PopupMenuItem(
-                onTap: () async {
-                  bool? hasSaved = await navToEditTypes(typeMap);
-
-                  if (hasSaved == true) {
-                    setState(() {
-                      todos.removeWhere((todo){
-                        if(!isContained(todo.type)){
-                          return true;
-                        }return false;
-                      });
-                    });
-                  }
+                onTap: () {
+                  navToEditTypes(typeMap);
                 },
                 child: Text("Edit To Do types"),
               ),
@@ -188,102 +113,86 @@ class _LandingPageState extends State<LandingPage> {
             const Text("Your To Do List:"),
             const SizedBox(height: 20),
             Expanded(
-              child: FutureBuilder<List<Todo>>(
-                future: futureTodos,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Text("C'è stato un errore: ${snapshot.error}");
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Text("Nessun TODO! Aggiungine uno!");
-                  } else {
-                    final todos = snapshot.data!;
-                    return SingleChildScrollView(
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color:
-                              Colors.grey[200], // colore del container generale
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          children: todos.map((todo) {
-                            return InkWell(
-                              onTap: () async {
-                                final Todo? newToDo = await navigateTo(
-                                  UptTodo(typeList: typeMap, todoToUpt: todo),
-                                );
-                                if (newToDo != null) {
+              child: ListView.builder(
+                itemCount: todoMap.length,
+                itemBuilder: (context, index) {
+                  final todo = todoMap.values.elementAt(index);
+                  return InkWell(
+                    onTap: () {
+                      navigateTo(UptTodo(todoToUpt: todo));
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      key: ValueKey(todo.id),
+                      margin: const EdgeInsets.symmetric(vertical: 5),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: todo.type.color,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              if (todo.urgent) Icon(Icons.warning),
+                              Checkbox(
+                                value: todo.checked,
+                                onChanged: (value) {
                                   setState(() {
-                                    todos.removeAt(todos.indexOf(todo));
-                                    todos.add(newToDo);
+                                    if (!todo.checked && !isDisabled) {
+                                      todo.checked = true;
+                                      isChecked = true;
+                                      disableCheckbox();
+                                    } else if (todo.checked) {
+                                      todo.checked = false;
+                                      isChecked = false;
+                                      isDisabled = false;
+                                    }
                                   });
-                                }
-                              },
-                              child: Container(
-                                width: double.infinity,
-                                key: ValueKey(todo.id),
-                                margin: const EdgeInsets.symmetric(vertical: 5),
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: todo.type.color,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        if (todo.urgent) Icon(Icons.warning),
-                                        Checkbox(
-                                          value: todo.checked,
-                                          onChanged: (value) {
-                                            setState(() {
-                                              if (!todo.checked &&
-                                                  !isDisabled) {
-                                                // Checkbox era false, ora diventa true → avvia countdown
-                                                todo.checked = true;
-                                                isChecked = true;
-                                                disableCheckbox();
-                                              } else if (todo.checked) {
-                                                // Checkbox era true, ora diventa false → blocca countdown
-                                                todo.checked = false;
-                                                isChecked = false;
-                                                isDisabled = false;
-                                              }
-                                            });
-                                          },
-                                        ),
-
-                                        Expanded(
-                                          child: Text(
-                                            todo.description,
-                                            style: TextStyle(
-                                              color:
-                                                  isColorDark(todo.type.color)
-                                                  ? Colors.white
-                                                  : Colors.black,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                },
+                              ),
+                              Expanded(
+                                child: Text(
+                                  todo.description,
+                                  style: TextStyle(
+                                    color: isColorDark(todo.type.color)
+                                        ? Colors.white
+                                        : Colors.black,
+                                  ),
                                 ),
                               ),
-                            );
-                          }).toList(),
-                        ),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  }
+                    ),
+                  );
                 },
               ),
             ),
             CountdownBar(
               isOn: isChecked,
               onStart: disableCheckbox,
-              onFinished: deleteToDo,
+              onFinished: () {
+                Todo todoToDelete = todoMap.entries
+                    .firstWhere((todo) => todo.value.checked)
+                    .value;
+
+                ref.read(todoProvider.notifier).deleteTodo(todoToDelete.id);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ref.read(todoProvider).errorMessage.isEmpty ? "Todo deleted successfully" : "Error during todo elimination",),
+                    duration: Duration(milliseconds: 1500),
+                  ),
+                );
+
+                setState(() {
+                  isDisabled = false;
+                  isChecked = false;
+                });
+              },
             ),
           ],
         ),

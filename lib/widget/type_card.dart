@@ -107,7 +107,7 @@ class _TypeCardState extends State<TypeCard> {
               ),
               SizedBox(height: 20,),
               ElevatedButton(onPressed: (){
-                widget.onSave(widget.type, _formKey);
+                widget.onSave(_formKey);
               }, child: Text("Salva")),
               
             ],
